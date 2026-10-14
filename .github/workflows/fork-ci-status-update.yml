@@ -66,50 +66,44 @@ jobs:
               const detailsUrl = run
                 ? `https://github.com/${owner}/${repo}/actions/runs/${run.id}`
                 : `https://github.com/${owner}/${repo}/actions/workflows/fork-ci.yml`;
-              if (!forkChecks.length) {
-                const status = !run || run.status === 'completed' ? 'completed' : 'queued';
-                const conclusion = run && run.status === 'completed'
-                  ? run.conclusion
-                  : (run ? undefined : 'action_required');
-                const output = run
-                  ? {
-                      title: 'Fork CI results',
-                      summary: `[See fork CI results](${detailsUrl})`,
-                      text: JSON.stringify({ owner, repo, run_id: run.id })
-                    }
-                  : {
-                      title: 'Fork CI is not available',
-                      summary: 'Enable GitHub Actions in the fork and push the PR branch again.',
-                      text: JSON.stringify({ owner, repo, workflow: 'fork-ci.yml' })
-                    };
-                await github.rest.checks.create({
-                  owner: context.repo.owner, repo: context.repo.repo,
-                  name: 'Fork CI', head_sha: pr.head.sha, status,
-                  ...(conclusion ? { conclusion } : {}),
-                  details_url: detailsUrl, output
-                });
-              }
+              const status = !run || run.status === 'completed' ? 'completed' :
+                (run.status === 'in_progress' ? 'in_progress' : 'queued');
+              const conclusion = !run ? 'action_required' :
+                (status === 'completed' ? run.conclusion : undefined);
+              const output = run
+                ? {
+                    title: 'Fork CI results',
+                    summary: `[See fork CI results](${detailsUrl})`,
+                    text: JSON.stringify({ owner, repo, run_id: run.id, run_attempt: run.run_attempt })
+                  }
+                : {
+                    title: 'Fork CI is not available',
+                    summary: 'Enable GitHub Actions in the fork and push the PR branch again.',
+                    text: JSON.stringify({ owner, repo, workflow: 'fork-ci.yml' })
+                  };
 
-              for (const check of forkChecks) {
-                if (!run) {
-                  await github.rest.checks.update({
-                    owner: context.repo.owner, repo: context.repo.repo,
-                    check_run_id: check.id, status: 'completed', conclusion: 'action_required',
-                    details_url: detailsUrl, output: check.output
-                  });
-                  continue;
-                }
-                const status = run.status === 'completed' ? 'completed' :
-                  (run.status === 'in_progress' ? 'in_progress' : 'queued');
-                const params = {
-                  owner: context.repo.owner, repo: context.repo.repo,
-                  check_run_id: check.id, status, details_url: detailsUrl,
-                  output: check.output
-                };
-                if (status === 'completed') params.conclusion = run.conclusion;
-                await github.rest.checks.update(params);
+              const latest = forkChecks.sort((a, b) => b.id - a.id)[0];
+              let recorded = {};
+              try {
+                recorded = JSON.parse((latest && latest.output && latest.output.text) || '{}');
+              } catch (error) {
+                recorded = {};
               }
-
+              // A completed check run cannot go back to in progress, so a re-run of the
+              // fork workflow gets a new check run; the pull request shows the newest one.
+              const rerun = latest && latest.status === 'completed' && run &&
+                (recorded.run_id !== run.id ||
+                  (recorded.run_attempt !== undefined && recorded.run_attempt !== run.run_attempt));
+              const params = {
+                owner: context.repo.owner, repo: context.repo.repo,
+                status, ...(conclusion ? { conclusion } : {}),
+                details_url: detailsUrl, output
+              };
+              if (!latest || rerun) {
+                await github.rest.checks.create({ ...params, name: 'Fork CI', head_sha: pr.head.sha });
+              } else {
+                await github.rest.checks.update({ ...params, check_run_id: latest.id });
+              }
             };
 
             // Keep one pull request's failure from stopping the rest of the sweep.
