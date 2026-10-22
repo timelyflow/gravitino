@@ -89,5 +89,3 @@ public class HologresCatalog extends JdbcCatalog {
     return new HologresColumnDefaultValueConverter();
   }
 }
-
-// [SANDBOX] Test change for apache/gravitino#13049.
