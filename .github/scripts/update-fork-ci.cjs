@@ -71,7 +71,8 @@ async function update({ github, context, core, clock = Date.now }) {
       : result.conclusion === 'success' ? 'Verified all caller suites.' : 'Open the run to see which jobs did not succeed.');
     const testedBase = mirror.base && mirror.base !== pr.base.sha ? `\nTested base: ${mirror.base}` : '';
     const record = { owner: mirror.owner, repo: mirror.repo, run_id: run?.id,
-      run_attempt: run?.run_attempt, base_ref: pr.base.ref, base_sha: pr.base.sha, trusted: mirror.trusted || false,
+      run_attempt: run?.run_attempt, run_status: run?.status, run_conclusion: run?.conclusion,
+      base_ref: pr.base.ref, base_sha: pr.base.sha, trusted: mirror.trusted || false,
       fork_run_id: mirror.fork?.id, fork_run_attempt: mirror.fork?.run_attempt };
     const details = run ? `https://github.com/${mirror.owner}/${mirror.repo}/actions/runs/${run.id}` : pr.html_url;
     const output = { title: result.title,
@@ -91,10 +92,14 @@ async function update({ github, context, core, clock = Date.now }) {
     const oldRecord = recordOf(latest);
     // A run already recorded for this commit still exists; a listing that missed it is incomplete.
     if (!record.run_id && oldRecord.run_id) return;
+    // Older publishers completed action_required checks before CI edits finished running.
+    // Those checks need repair; a terminal execution result must still resist stale API reads.
+    const executionCompleted = oldRecord.run_status === 'completed' ||
+      (!oldRecord.run_status && latest?.status === 'completed' && latest.conclusion !== 'action_required');
     if (oldRecord.owner === record.owner && oldRecord.repo === record.repo && record.run_id &&
         (oldRecord.run_id > record.run_id || (oldRecord.run_id === record.run_id &&
           (oldRecord.run_attempt > record.run_attempt ||
-            (oldRecord.run_attempt === record.run_attempt && latest.status === 'completed' && result.status !== 'completed'))))) return;
+            (oldRecord.run_attempt === record.run_attempt && executionCompleted && result.status !== 'completed'))))) return;
     const sameRun = oldRecord.run_id === record.run_id && oldRecord.run_attempt === record.run_attempt && oldRecord.base_sha === record.base_sha && oldRecord.base_ref === record.base_ref;
     if (!latest || (latest.status === 'completed' && (!sameRun || result.status !== 'completed'))) {
       await github.rest.checks.create({ ...params, name: 'Fork CI', head_sha: pr.head.sha });
@@ -145,8 +150,9 @@ async function update({ github, context, core, clock = Date.now }) {
           if (!pr.head.repo) return;
           const record = recordOf(latest);
           const fork = (await service.findRun(pr, false))?.run;
-          if (!fork || (fork.id === (record.fork_run_id ?? record.run_id) &&
-              fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt))) {
+          if (record.run_status === 'completed' && (!fork || (fork.status === 'completed' &&
+              fork.id === (record.fork_run_id ?? record.run_id) &&
+              fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt)))) {
             // A completed metadata check does not prove the visible status was written:
             // the status API can fail after the check write, or this may be a pre-migration PR.
             const { data } = await github.rest.repos.getCombinedStatusForRef({

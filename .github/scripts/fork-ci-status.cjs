@@ -132,13 +132,20 @@ function createService(github) {
       note: 'No Fork CI run was found for this commit yet. If none starts, enable Actions in your fork and push again, ' +
         'or ask a committer to dispatch trusted Fork CI.' } };
     const { owner, repo, run } = selected;
-    if (!selected.trusted && !sameDefinitions) return { ...selected, fork: ordinary?.run,
-      result: requiredAction('CI workflow/action/script definitions or branch protection differ from the base. ' +
-        'A committer must dispatch Fork CI from the current upstream default branch with this PR number.') };
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = await jobsFor(owner, repo, run);
     const base = selected.trusted ? pr.base.sha : await testedBase(pr, jobs);
-    return { ...selected, fork: ordinary?.run, base, result: evaluate(pr, run, jobs, base) };
+    let result = evaluate(pr, run, jobs, base);
+    if (!selected.trusted && !sameDefinitions) {
+      const note = 'CI workflow/action/script definitions or branch protection differ from the base. ' +
+        'After reviewing these changes, a committer must dispatch Fork CI from the current upstream default branch with this PR number.';
+      // Approval of CI edits is separate from execution progress. Never turn a running fork
+      // into a completed error, or hide an actual failure behind the trust requirement.
+      result = run.status === 'completed' && run.conclusion === 'success'
+        ? { ...requiredAction(note), title: 'Fork CI passed; trusted verification required' }
+        : { ...result, note: `${result.title}. ${note}` };
+    }
+    return { ...selected, fork: ordinary?.run, base, result };
   }
   return { mirror, unchanged, findRun };
 }
