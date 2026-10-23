@@ -13,6 +13,6 @@ jobs:
         with:
           script: |
             const c = await github.rest.checks.create({...context.repo, name:'CI check reset probe', head_sha:context.sha, status:'completed', conclusion:'action_required', output:{title:'Initial terminal result', summary:'Test-only check'}});
-            const reset = await github.rest.checks.update({...context.repo, check_run_id:c.data.id, status:'in_progress', conclusion:null});
+            const reset = await github.rest.checks.update({...context.repo, check_run_id:c.data.id, status:'in_progress'});
             core.info(JSON.stringify({id:c.data.id,status:reset.data.status,conclusion:reset.data.conclusion,completed_at:reset.data.completed_at}));
             await github.rest.checks.update({...context.repo,check_run_id:c.data.id,status:'completed',conclusion:'success',output:{title:'API reset probe completed',summary:'Recorded the real API reset semantics.'}});
