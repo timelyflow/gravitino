@@ -134,7 +134,7 @@ function createService(github) {
     const { owner, repo, run } = selected;
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = await jobsFor(owner, repo, run);
-    const base = selected.trusted ? pr.base.sha : await testedBase(pr, jobs);
+    const base = selected.trusted || !sameDefinitions ? pr.base.sha : await testedBase(pr, jobs);
     let result = evaluate(pr, run, jobs, base);
     if (!selected.trusted && !sameDefinitions) {
       const note = 'CI workflow/action/script definitions or branch protection differ from the base. ' +

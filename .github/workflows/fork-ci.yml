@@ -3,7 +3,7 @@ name: Fork CI
 run-name: "${{ github.event_name == 'workflow_dispatch' && format('Trusted Fork CI #{0}', inputs.pull-request) || format('Fork CI {0}', github.ref_name) }}"
 on:
   push:
-    branches: ['**']
+    branches: [fork-pr-test, v4-conflict-pr]
   workflow_dispatch:
     inputs:
       pull-request:
@@ -68,7 +68,7 @@ jobs:
           FORCE_FAILURE: ${{ vars.CI_STATUS_E2E_FAIL_20261023 }}
         run: |
           echo "Controlled failure=$FORCE_FAILURE"
-          sleep 20
+          sleep 180
           test "$FORCE_FAILURE" != 'true'
   backend:
     name: backend / fast-probe
