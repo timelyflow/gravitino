@@ -136,7 +136,7 @@ async function update({ github, context, core, clock = Date.now }) {
     // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
     const recent = manual ? [] : prs.filter(pr => now - Date.parse(pr.updated_at) < RECENT_MS)
       .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
-    // Probes take two calls, so rotate them too and keep a third of the budget for older PRs.
+    // Probes need up to four calls, so rotate them too and keep a third of the budget for older PRs.
     const recentBudget = Math.floor(budget * 2 / 3);
     const recentStart = !recent.length ? 0 : (Math.floor(now / slotMs) * Math.max(1, Math.floor(recentBudget / 4))) % recent.length;
     let probed = 0;
@@ -150,7 +150,13 @@ async function update({ github, context, core, clock = Date.now }) {
           if (!pr.head.repo) return;
           const record = recordOf(latest);
           const fork = (await service.findRun(pr, false))?.run;
-          if (record.run_status === 'completed' && (!fork || (fork.status === 'completed' &&
+          // Trusted reruns and new dispatches also start without a PR-head signal. A
+          // settled fork alone cannot prove the selected trusted execution is settled.
+          const trusted = (await service.findRun(pr, true))?.run;
+          const trustedSettled = record.trusted
+            ? trusted?.id === record.run_id && trusted.run_attempt === record.run_attempt && trusted.status === 'completed'
+            : !trusted;
+          if (trustedSettled && record.run_status === 'completed' && (!fork || (fork.status === 'completed' &&
               fork.id === (record.fork_run_id ?? record.run_id) &&
               fork.run_attempt === (record.fork_run_attempt ?? record.run_attempt)))) {
             // A completed metadata check does not prove the visible status was written:
