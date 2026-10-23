@@ -1,43 +1,22 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-
-# Run the complete CI entry point from branch pushes in the contributor's repository.
+# Sandbox-only fast jobs; publisher scripts are the PR implementation with repository identity adapted.
 name: Fork CI
 run-name: "${{ github.event_name == 'workflow_dispatch' && format('Trusted Fork CI #{0}', inputs.pull-request) || format('Fork CI {0}', github.ref_name) }}"
-
 on:
   push:
     branches: ['**']
   workflow_dispatch:
     inputs:
       pull-request:
-        description: 'PR to test using the reviewed workflows on the default branch (committers only)'
+        description: Sandbox PR number
         required: true
         type: string
-
 permissions:
   contents: read
   actions: read
   pull-requests: read
-
 concurrency:
-  group: fork-ci-${{ github.event_name }}-${{ inputs.pull-request || github.ref }}
+  group: sandbox-fork-ci-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   eligibility:
     name: Resolve fork CI eligibility
@@ -73,246 +52,157 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/merge-check"
           cd "${RUNNER_TEMP}/merge-check"
           git init --quiet
-          git fetch --quiet --no-tags https://github.com/apache/gravitino.git "${BASE_SHA}"
+          git fetch --quiet --no-tags https://github.com/timelyflow/gravitino.git "${BASE_SHA}"
           git fetch --quiet --no-tags "https://github.com/${HEAD_REPOSITORY}.git" "${HEAD_SHA}"
           git merge-tree --write-tree --name-only "${BASE_SHA}" "${HEAD_SHA}"
 
   build:
+    name: build / fast-probe
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/build.yml
-
-  backend:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/backend-integration-test.yml
-
-  spark:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/spark-integration-test.yml
-
-  flink:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/flink-integration-test.yml
-
-  trino:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/trino-integration-test.yml
-
-  iceberg_rest_trino:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/iceberg-rest-trino-integration-test.yml
-
-  python:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/python-integration-test.yml
-
-  frontend:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/frontend-integration-test.yml
-
-  access_control:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/access-control-integration-test.yml
-
-  idp_basic:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/idp-basic-test.yml
-
-  mcp:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/mcp-integration-test.yml
-
-  maintenance:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/maintenance-integration-test.yml
-
-  web_ui:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/web-ui-tests.yml
-
-  charts:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/chart-test.yaml
-
-  contrib_catalog:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/contrib-catalog-test.yml
-
-  asf_allowlist:
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    with:
-      base-ref: ${{ needs.eligibility.outputs.base-ref }}
-      base-sha: ${{ needs.eligibility.outputs.base-sha }}
-      head-repository: ${{ needs.eligibility.outputs.head-repository }}
-      head-sha: ${{ needs.eligibility.outputs.head-sha }}
-      sync: ${{ needs.eligibility.outputs.sync }}
-    uses: ./.github/workflows/asf-allowlist-check.yml
-
-  fail_fast:
-    name: Stop on first failure
-    needs: eligibility
-    if: needs.eligibility.outputs.valid == 'true'
-    # Not ubuntu-slim: it limits jobs to 15 minutes, and this job lasts as long as the slowest suite.
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    permissions:
-      contents: read
-      actions: write
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/github-script@v7
-        with:
-          retries: 3
-          script: |
-            await require('./.github/scripts/fail-fast.cjs').watch({ github, context, core, self: 'Stop on first failure' });
-
-  required_ci:
-    name: Required CI / ${{ needs.eligibility.outputs.base-ref }} / ${{ needs.eligibility.outputs.base-sha }} / ${{ needs.eligibility.outputs.head-sha }}
-    # !cancelled() rather than always(), so a cancelled run does not wait for a runner here.
-    if: ${{ !cancelled() && needs.eligibility.outputs.valid == 'true' }}
-    needs:
-      - eligibility
-      - build
-      - backend
-      - spark
-      - flink
-      - trino
-      - iceberg_rest_trino
-      - python
-      - frontend
-      - access_control
-      - idp_basic
-      - mcp
-      - maintenance
-      - web_ui
-      - charts
-      - contrib_catalog
-      - asf_allowlist
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify required CI suites
+      - name: Controlled quick verdict
         env:
+          FORCE_FAILURE: ${{ vars.CI_STATUS_E2E_FAIL_20261023 }}
+        run: |
+          echo "Controlled failure=$FORCE_FAILURE"
+          sleep 20
+          test "$FORCE_FAILURE" != 'true'
+  backend:
+    name: backend / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  spark:
+    name: spark / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  flink:
+    name: flink / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  trino:
+    name: trino / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  iceberg_rest_trino:
+    name: iceberg_rest_trino / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  python:
+    name: python / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  frontend:
+    name: frontend / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  access_control:
+    name: access_control / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  idp_basic:
+    name: idp_basic / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  mcp:
+    name: mcp / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  maintenance:
+    name: maintenance / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  web_ui:
+    name: web_ui / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  charts:
+    name: charts / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  contrib_catalog:
+    name: contrib_catalog / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  asf_allowlist:
+    name: asf_allowlist / fast-probe
+    needs: eligibility
+    if: needs.eligibility.outputs.valid == 'true'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - run: echo 'Fast caller probe passed'
+  required:
+    name: Required CI / ${{ needs.eligibility.outputs.base-ref }} / ${{ needs.eligibility.outputs.base-sha }} / ${{ needs.eligibility.outputs.head-sha }}
+    if: always()
+    needs: [eligibility, build, backend, spark, flink, trino, iceberg_rest_trino, python, frontend, access_control, idp_basic, mcp, maintenance, web_ui, charts, contrib_catalog, asf_allowlist]
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
-          set -euo pipefail
-          echo "Required CI suite results:"
-          jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<< "${RESULTS}"
-          failures="$(
-            jq -r '
-              to_entries[]
-              | select(.value.result != "success" and .value.result != "skipped")
-              | "\(.key)=\(.value.result)"
-            ' <<< "${RESULTS}"
-          )"
-          if [ -n "${failures}" ]; then
-            echo "::error::One or more required CI suites did not succeed."
-            echo "${failures}"
-            exit 1
-          fi
+          python3 - <<'CHECK'
+          import json, os
+          results=json.loads(os.environ['RESULTS'])
+          print({name: value['result'] for name,value in results.items()})
+          assert all(value['result']=='success' for value in results.values())
+          CHECK

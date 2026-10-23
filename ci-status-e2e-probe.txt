@@ -1,0 +1,1 @@
+Sandbox base for CI status publisher tests.

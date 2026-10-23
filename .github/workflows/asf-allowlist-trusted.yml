@@ -36,7 +36,7 @@ jobs:
   scan:
     name: Scan PR workflow files
     if: >-
-      github.repository == 'apache/gravitino' &&
+      github.repository == 'timelyflow/gravitino' &&
       (github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request')
     # A required check: keep it off the shared ubuntu-latest pool, where small jobs can queue for hours.
     # The allowlist action installs its own Python, so it supports ubuntu-slim.
