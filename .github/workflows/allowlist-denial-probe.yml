@@ -1,9 +1,0 @@
-name: Sandbox allowlist denial probe
-on: workflow_dispatch
-permissions: {}
-jobs:
-  never_execute:
-    if: ${{ false }}
-    runs-on: ubuntu-slim
-    steps:
-      - uses: ci-status-e2e-unapproved/action@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
