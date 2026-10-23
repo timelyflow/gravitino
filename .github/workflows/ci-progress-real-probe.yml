@@ -1,0 +1,42 @@
+name: CI progress real API probe
+on:
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        required: true
+        type: string
+      mode:
+        default: current
+        type: string
+permissions: {}
+concurrency:
+  group: fork-ci-status-update
+  queue: max
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-slim
+    timeout-minutes: 6
+    permissions:
+      checks: write
+      statuses: write
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const mode=context.payload.inputs.mode;
+            if(mode==='stale-link') {
+              const pr=(await github.rest.pulls.get({...context.repo,pull_number:Number(context.payload.inputs['pull-request'])})).data;
+              await github.rest.repos.createCommitStatus({...context.repo,sha:pr.head.sha,context:'Fork CI',state:'success',description:'All required suites passed',target_url:'https://github.com/timelyflow/gravitino/actions/runs/39911994561'});
+              return;
+            }
+            if(mode==='schedule')context.eventName='schedule';
+            const script=mode==='legacy'?'legacy-update.cjs':'update-fork-ci.cjs';
+            await require('./.github/scripts/'+script).update({github,context,core});

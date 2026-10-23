@@ -20,8 +20,6 @@ on:
   workflow_run:
     workflows: [Fork CI PR Signal, Fork CI]
     types: [completed]
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       pull-request:

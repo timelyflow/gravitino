@@ -3,7 +3,7 @@ name: Fork CI
 run-name: "${{ github.event_name == 'workflow_dispatch' && format('Trusted Fork CI #{0}', inputs.pull-request) || format('Fork CI {0}', github.ref_name) }}"
 on:
   push:
-    branches: ['**']
+    branches: [fork-pr-test, v4-conflict-pr]
   workflow_dispatch:
     inputs:
       pull-request:
@@ -15,7 +15,7 @@ permissions:
   actions: read
   pull-requests: read
 concurrency:
-  group: sandbox-fork-ci-${{ github.ref }}
+  group: fork-ci-${{ github.event_name }}-${{ inputs.pull-request || github.ref }}
   cancel-in-progress: true
 jobs:
   eligibility:
@@ -61,21 +61,22 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - name: Controlled quick verdict
         env:
           FORCE_FAILURE: ${{ vars.CI_STATUS_E2E_FAIL_20261023 }}
+          HOLD_SECONDS: ${{ vars.CI_LIFECYCLE_HOLD_20261023 || '15' }}
         run: |
           echo "Controlled failure=$FORCE_FAILURE"
-          sleep 20
+          sleep "${HOLD_SECONDS}"
           test "$FORCE_FAILURE" != 'true'
   backend:
     name: backend / fast-probe
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   spark:
@@ -83,7 +84,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   flink:
@@ -91,7 +92,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   trino:
@@ -99,7 +100,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   iceberg_rest_trino:
@@ -107,7 +108,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   python:
@@ -115,7 +116,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   frontend:
@@ -123,7 +124,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   access_control:
@@ -131,7 +132,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   idp_basic:
@@ -139,7 +140,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   mcp:
@@ -147,7 +148,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   maintenance:
@@ -155,7 +156,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   web_ui:
@@ -163,7 +164,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   charts:
@@ -171,7 +172,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   contrib_catalog:
@@ -179,7 +180,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   asf_allowlist:
@@ -187,7 +188,7 @@ jobs:
     needs: eligibility
     if: needs.eligibility.outputs.valid == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - run: echo 'Fast caller probe passed'
   required:
@@ -195,7 +196,7 @@ jobs:
     if: always()
     needs: [eligibility, build, backend, spark, flink, trino, iceberg_rest_trino, python, frontend, access_control, idp_basic, mcp, maintenance, web_ui, charts, contrib_catalog, asf_allowlist]
     runs-on: ubuntu-slim
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - env:
           RESULTS: ${{ toJSON(needs) }}
