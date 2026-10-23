@@ -1,1 +1,3 @@
 Sandbox base for CI status publisher tests.
+Quick failure and rerun-recovery scenario for PR15.
+Skip CI once to exercise a missing run.
