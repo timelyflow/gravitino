@@ -157,7 +157,10 @@ async function update({ github, context, core, clock = Date.now }) {
             // the status API can fail after the check write, or this may be a pre-migration PR.
             const { data } = await github.rest.repos.getCombinedStatusForRef({
               ...context.repo, ref: pr.head.sha, per_page: 100 });
-            if (data.statuses.some(status => status.context === 'Fork CI' && status.state === statusState(latest))) return;
+            const details = record.run_id
+              ? `https://github.com/${record.owner}/${record.repo}/actions/runs/${record.run_id}` : pr.html_url;
+            if (data.statuses.some(status => status.context === 'Fork CI' && status.state === statusState(latest) &&
+                status.description === latest.output?.title?.slice(0, 140) && status.target_url === details)) return;
           }
         }
         await refresh(pr);
