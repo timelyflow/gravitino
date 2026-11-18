@@ -111,3 +111,6 @@ async function resolve({ github, context, core }) {
   })) core.setOutput(name, value);
 }
 module.exports = { resolve };
+
+// Sandbox contributor CI change: requires upstream trusted verification.
+// Advance the PR head to verify old trusted results cannot certify a new commit.
